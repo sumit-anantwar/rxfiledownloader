@@ -1,62 +1,57 @@
 package com.example.retrofitdownloadzip;
 
 import android.os.Bundle;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
-import android.view.View;
-import android.widget.TextView;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.widget.Toast;
 
-import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
+import rx.downloadlibrary.Downloadable;
 import rx.downloadlibrary.Downloader;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
-    private TextView progressView;
+    private MyRecyclerViewAdapter myRecyclerViewAdapter;
     private Downloader downloader;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        List<Downloadable> events = new ArrayList<>();
+        events.add(Downloadable.Companion.newEvent("https://pkg.popguide.me/PM_000579_en_v20181018_124932.tgz"));
+        events.add(Downloadable.Companion.newEvent("https://pkg.popguide.me/PM_000183_ru_v20180703_082725.tgz"));
+        events.add(Downloadable.Companion.newEvent("https://pkg.popguide.me/PM_000626_zh_v20181005_150653.tgz"));
+        events.add(Downloadable.Companion.newEvent("https://pkg.popguide.me/PM_000202_it_v20180914_155611.tgz"));
+
         setContentView(R.layout.activity_main);
-        progressView = findViewById(R.id.progress);
+        RecyclerView recyclerView = findViewById(R.id.links);
 
-        findViewById(R.id.download_rxjava).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                downloadTgzFileRx();
-            }
-        });
-        findViewById(R.id.download_rxkotlin).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Snackbar.make(v, "not done yet", Snackbar.LENGTH_SHORT).show();
-                downloadZipFileRxKotlin();
-            }
-        });
-        findViewById(R.id.cancel).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                downloader.unRegisterListener();
-                downloader.cancel();
-            }
-        });
+        myRecyclerViewAdapter = new MyRecyclerViewAdapter();
+        recyclerView.setAdapter(myRecyclerViewAdapter);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-    }
-
-    private void downloadZipFileRxKotlin() {
-        // does not work for now
-        String url = "https://pkg.popguide.me/PM_000579_en_v20181018_124932.tgz";
-        File saveLocation = new File(getFilesDir() + File.separator + "PM_000579_en_v20181018_124932.tgz");
-
-    }
+        myRecyclerViewAdapter.setEvents(events);
 
 
-    private void downloadTgzFileRx() {
-        String url = "https://pkg.popguide.me/PM_000579_en_v20181018_124932.tgz";
-        File saveLocation = new File(getFilesDir() + File.separator + "PM_000579_en_v20181018_124932.tgz");
         downloader = new Downloader();
-        downloader.registerListener(progress -> progressView.setText(progress.toString()));
-        downloader.downloadFileTgz(url, saveLocation);
+        downloader.setFilesDir(getFilesDir());
+        downloader.listenProgress(event -> myRecyclerViewAdapter.updateItem(event));
+        myRecyclerViewAdapter.subscribe(event -> {
+            Toast.makeText(getBaseContext(), event.getType().name(), Toast.LENGTH_SHORT).show();
+            if (event.getType() == Downloadable.Type.DOWNLOAD) downloader.download(event);
+            if (event.getType() == Downloadable.Type.CANCEL) downloader.cancel(event);
+        });
+
+        findViewById(R.id.loadAll).setOnClickListener(v -> downloader.downLoadAsync(events));
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (downloader != null) downloader.dispose();
     }
 }
